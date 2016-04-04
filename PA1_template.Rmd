@@ -1,25 +1,430 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
+
+```{r, setoptions, echo = TRUE, results = "asis", eval = TRUE}
+```
 
 
-## Loading and preprocessing the data
+Commit containing full submission  
+1) Code for reading in the dataset and/or processing the data  
+2) Histogram of the total number of steps taken each day  
+3) Mean and median number of steps taken each day  
+4) Time series plot of the average number of steps taken  
+5) The 5 minute interval that, on average, contains the maximum number of steps  
+6) Code to describe and show a strategy for imputing missing data  
+7) Histogram of the total number of steps taken each day after missing values are imputed  
+8) Panel plot comparing the average number of steps taken per 5 minute interval across weekdays and weekends  
+9) All of the R code needed to reproduce the results (numbers, plots, etc) in the report  
+
+```{r}
+# Install packages
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(scales)
+library(knitr)
+```
+
+
+```{r, echo = TRUE}
+# Read in data 
+df <- read.csv("activity.csv",
+               na.strings = c("NA",""), 
+               sep = ",", strip.white = TRUE,
+               colClasses = "character")
+
+# Examine the structure
+str(df)
+```
+
+
+```{r}
+# Change class of objects
+df$date <- ymd(df$date)
+df$steps <- as.numeric(df$steps)
+df$interval <- as.numeric(df$interval)
+```
 
 
 
-## What is mean total number of steps taken per day?
+```{r, echo = TRUE}
+# Create a new unique date field
+
+# Add leading zeros to the interval field
+df$newInterval <- sprintf("%04d", df$interval)
+
+# Combine the new interval field (which is in military time for minutes and seconds)...
+# ...with the date field
+df$newDate <- paste(df$date, df$newInterval, sep = " ")
+
+# Change this new field to date format
+df$newDate <- parse_date_time(df$newDate, "ymd hm")
+
+head(df, 6)
+```
+
+
+```{r, echo = TRUE}
+# Add a field for day of Week
+df$dayOfWeek <- weekdays(df$date)
+
+# Add columns that extract the hours and minutes from the date field
+df$hrs <- hour(df$newDate)
+df$mins <- minute(df$newDate)
+
+# Create a new column with unique hour-minute combo
+df$hoursMinutes <- paste(df$hrs, df$mins, sep = " : ")
+
+head(df,6)
+```
 
 
 
-## What is the average daily activity pattern?
+```{r, echo = TRUE}
+# Summarise overall
+
+pacesSummary <- df %>% 
+    summarise(stepsTaken = sum(steps, na.rm = TRUE), # Total number of steps taken
+              days = n_distinct(date), # Total number of days
+              avgStepsPerDay = stepsTaken / days, # Total steps divided by total days
+              avgStepsPerHour = avgStepsPerDay / 24, # Steps/day divided by 24 hours
+              avgStepsPer5minInterval = avgStepsPerHour / 12) # There are 12, 5-minute intervals in an hour
+# Round
+pacesSummary$avgStepsPerDay <- round(pacesSummary$avgStepsPerDay, digits = 2)
+pacesSummary$avgStepsPerHour <- round(pacesSummary$avgStepsPerHour, digits = 2)
+pacesSummary$avgStepsPer5minInterval <- round(pacesSummary$avgStepsPer5minInterval, digits = 2)
+
+head(pacesSummary)
+```
+
+
+```{r, echo = TRUE}
+# Group by date and then summarise for each day
+dailyPaces <- df %>% 
+    group_by(date) %>% 
+    summarise(dailyEntries = n(),
+              inactive = sum(steps == 0),
+              active = sum(!steps == 0),
+              percentActive = active / dailyEntries,
+              totalSteps = sum(steps, na.rm = TRUE), 
+              avgStepsPer5minInterval = mean(steps, na.rm = TRUE),
+              avgStepsPerHour = totalSteps / 24,
+              avgStepsPerDay = mean(steps, na.rm = TRUE))
+
+# Round
+dailyPaces$avgStepsPer5minInterval <- round(dailyPaces$avgStepsPer5minInterval, digits = 2)
+dailyPaces$avgStepsPerHour <- round(dailyPaces$avgStepsPerHour, digits = 2)
+dailyPaces$avgStepsPerDay <- round(dailyPaces$avgStepsPerDay, digits = 2)
+dailyPaces$percentActive <- round(dailyPaces$percentActive, digits = 2)
+
+head(dailyPaces, 6)
+```
+
+```{r}
+#     1. Calculate the total number of steps taken per day
+stepsEachDay <- dailyPaces$totalSteps # numeric vector of length 61
+```
+
+```{r}
+# Calculate and and report the mean and median of the total number of steps taken per day
+medianSteps <- median(stepsEachDay) # 10,395
+
+# Calculate total steps taken
+totalSteps <- pacesSummary$stepsTaken # 570,608
+
+# Calculate mean steps taken (Total Steps / Days) each day
+meanSteps <- totalSteps / 61 # 9,354.229...
+
+# Calulate the mean steps per 5 minute interval: 
+# TotalSteps divided by 61 days divided by 24 hours divided by 60 minutes divided by 12 measurements per hour
+avgStepsPer5mins <- ((((totalSteps / 61) / 24) / 60) / 12) # 0.54133
+```
+
+
+```{r}
+# Change steps each day to data frame
+stepsEachDay <- as.data.frame(stepsEachDay)
+
+# Name the column "Steps"
+colnames(stepsEachDay) <- "Steps"
+```
+
+```{r, echo = TRUE}
+#     2. Make a histogram of the total number of steps taken each day
+ggplot(stepsEachDay, aes(Steps)) +
+    geom_histogram(bins = 20, color = "green4", fill = "green") +
+    annotate(geom = "text", label = "Mean Steps per Day: ", x = 16500, y = 9, fontface = "italic") +
+    annotate(geom = "text", label = "Median Steps per Day: ", x = 16500, y = 8.5, fontface = "italic") +
+    annotate(geom = "text", label = comma(round(meanSteps, digits = 0)), x = 22000, y = 9, fontface = "bold.italic") +
+    annotate(geom = "text", label = comma(medianSteps), x = 22000, y = 8.5, fontface = "bold.italic")+
+    ggtitle("Histogram of Steps Taken Each Day") +
+    labs(x = "Steps", y = "Count")
+```
 
 
 
-## Imputing missing values
+#####################   WHAT IS THE AVERAGE DAILY ACTIVITY PATTERN?   ##################### 
+
+```{r, echo = TRUE}
+# Select only necessary columns for joining
+daily1 <- dailyPaces[, c(1,7)] # The Date field and the Avg Steps per 5-minute interval field
+
+head(daily1, 6)
+```
+
+```{r, echo = TRUE}
+# Add a column to the original data frame that includes the average steps for that day
+df1 <- left_join(df, daily1, by = "date") 
+
+head(df1, 6)
+```
 
 
 
-## Are there differences in activity patterns between weekdays and weekends?
+```{r, echo = TRUE}
+#     1. Make a times series plot (i.e., type = "l") of the 5-minute interval (x-axis) and 
+#        the average number of steps taken, averaged across all days (y-axis)
+par(mfrow = c(1,1))
+plot(df1$newDate, df1$avgStepsPer5minInterval,
+     type = "l",
+     col = "dodgerblue",
+     lwd = 4,
+     main = "Average Steps per 5-Minute Interval\nOct '12 - Dec '12",
+     xlab ="Date",
+     ylab = "Avg Steps per 5 Minute Interval")
+```
+
+```{r, echo = TRUE}
+#     2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+busiestFiveMins <- df %>% 
+    group_by(hoursMinutes) %>% 
+    summarise(stepsTaken = sum(steps, na.rm = TRUE)) %>% 
+    arrange(desc(stepsTaken)) %>% 
+    head(1) # 8:35am
+
+head(busiestFiveMins)
+```
+**So the busiest five minutes of steps is at 8:35am**
+
+
+```{r}
+#     1. Calculate and report the total number of missing values (NA's) in the dataset
+totalMissing <- sum(is.na(df$steps)) %>% print # 2,304
+```
+
+**The total number of missing values (NAs) in the dataset is 2,304**
+
+Devise a strategy for filling in all of the missing values in the dataset.  The strategy does not need to be sophisticated. 
+
+Calulate the Overall mean of steps per 5-minute interval for all days: 
+*TotalSteps divided by 61 days divided by 24 hours divided by 60 minutes divided by 12 measurements per hour*
+    ```{r}
+avgStepsPer5mins <- ((((totalSteps / 61) / 24) / 60) / 12) # 0.54
+avgStepsPer5mins
+```
+
+
+```{r, echo = TRUE}
+#    3. Create a new dataset that is equal to the original dataset but with the missing data filled in.
+newDataset <- df 
+
+head(newDataset, 6)
+```
+
+
+```{r, echo = TRUE}
+# Fill in missing values with the overall average steps per 5-minute interval
+newDataset$steps[is.na(newDataset$steps)] <- avgStepsPer5mins
+
+head(newDataset, 6)
+```
+
+
+
+4. Make a histogram of the total number of steps taken each day and Calculate and report the MEAN and MEDIAN total
+   number of steps taken per day.  Do these values differ from the estimates from the first part of this assignment?
+   What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+Summarise overall again
+```{r, echo = TRUE}
+pacesSummary1 <- newDataset %>% 
+    summarise(stepsTaken = sum(steps, na.rm = TRUE), # Total number of steps taken
+              days = n_distinct(date), # Total number of days
+              avgStepsPerDay = stepsTaken / days, # Total steps divided by total days
+              avgStepsPerHour = avgStepsPerDay / 24, # Steps/day divided by 24 hours
+              avgStepsPer5minInterval = avgStepsPerHour / 12) # There are 12, 5-minute intervals in an hour
+# Round
+pacesSummary1$avgStepsPerDay <- round(pacesSummary1$avgStepsPerDay, digits = 2)
+pacesSummary1$avgStepsPerHour <- round(pacesSummary1$avgStepsPerHour, digits = 2)
+pacesSummary1$avgStepsPer5minInterval <- round(pacesSummary1$avgStepsPer5minInterval, digits = 2)
+
+
+head(pacesSummary1, 6)
+```
+
+
+```{r, echo = TRUE}
+# Group by date to summarise for each day
+dailyPaces1 <- newDataset %>% 
+    group_by(date) %>% 
+    summarise(dailyEntries = n(),
+              inactive = sum(steps == 0),
+              active = sum(!steps == 0),
+              percentActive = active / dailyEntries,
+              totalSteps = sum(steps, na.rm = TRUE), 
+              avgStepsPer5minInterval = mean(steps, na.rm = TRUE),
+              avgStepsPerHour = totalSteps / 24,
+              avgStepsPerDay = mean(steps, na.rm = TRUE))
+
+# Round
+dailyPaces1$avgStepsPer5minInterval <- round(dailyPaces1$avgStepsPer5minInterval, digits = 2)
+dailyPaces1$avgStepsPerHour <- round(dailyPaces1$avgStepsPerHour, digits = 2)
+dailyPaces1$avgStepsPerDay <- round(dailyPaces1$avgStepsPerDay, digits = 2)
+dailyPaces1$percentActive <- round(dailyPaces1$percentActive, digits = 2)
+
+head(dailyPaces1, 6)
+```
+
+
+```{r}
+#     1. Calculate the total number of steps taken per day
+stepsEachDay2 <- dailyPaces1$totalSteps # numeric vector of length 61
+```
+
+
+
+Calculate and and report the mean and median of the total number of steps taken per day
+
+```{r}
+# Calculate the median
+medianSteps2 <- median(stepsEachDay2) # 10,395... Same as before
+
+# Calculate total steps taken
+totalSteps2 <- pacesSummary1$stepsTaken # was 570,608 now is 571,855
+
+# Calculate mean steps taken (Total Steps / Days) each day
+meanSteps2 <- totalSteps2 / 61 # 9,354.2... changed to 9,374.7, up 20 steps per day
+```
+
+Calulate the mean steps per 5 minute interval: 
+
+*TotalSteps divided by 61 days, divided by 24 hours, divided by 60 minutes, divided by 12 measurements per hour*
+    ```{r}
+avgStepsPer5mins2 <- ((((totalSteps2 / 61) / 24) / 60) / 12) #0.5425
+```
+
+```{r}
+# Change steps each day into a data frame
+stepsEachDay2 <- as.data.frame(dailyPaces1$totalSteps) # data frame with 61 observations
+
+colnames(stepsEachDay2) <- "Steps"
+```
+
+2. Make a histogram of the total number of steps taken each day and Calculate and report the MEAN and MEDIAN  
+   total number of steps taken per day.  
+
+```{r, echo = TRUE}
+ggplot(stepsEachDay2, aes(Steps)) +
+    geom_histogram(bins = 20, color = "blue", fill = "dodgerblue") +
+    annotate(geom = "text", label = "Mean Steps per Day: ", x = 16500, y = 9, fontface = "italic") +
+    annotate(geom = "text", label = "Median Steps per Day: ", x = 16500, y = 8.5, fontface = "italic") +
+    annotate(geom = "text", label = comma(round(meanSteps2, digits = 0)), x = 22000, y = 9, fontface = "bold.italic") +
+    annotate(geom = "text", label = comma(medianSteps2), x = 22000, y = 8.5, fontface = "bold.italic")+
+    ggtitle("Histogram of Steps Taken Each Day") +
+    labs(x = "Steps", y = "Count")
+```    
+
+ARE THERE DIFFERENCES IN ACTIVITY PATTERNS BETWEEN WEEKDAYS AND WEEKENDS?  
+(the weekdays() function may help.  Use the filled-in dataset)
+
+1. Create a nuew factor variable in the dataset with two levels - "weekday" and "weekend" - 
+    indicating whether a given date is a weekday or weekend day.
+
+```{r, echo = TRUE}
+# Create a weekdays vector and a weekends vector
+weekdays <- c("Monday","Tuesday","Wednesday","Thursday","Friday")
+
+# Use ifelse() function to add new column
+df$dayType <- ifelse(df$dayOfWeek %in% weekdays, "weekday","weekend") 
+
+#Change new column to a factor
+df$dayType <- factor(df$dayType, levels = c("weekday","weekend"))
+
+head(df, 6)
+```
+
+
+
+```{r, echo = TRUE}
+# Group by Day Type and Day of week and summarise to find mean for each 
+dayTypeSummary2 <- df %>% 
+    group_by(dayOfWeek) %>% 
+    summarise(dailyEntries = n(),
+              totalSteps = sum(steps, na.rm = TRUE), 
+              avgStepsPer5minInterval = mean(steps, na.rm = TRUE),
+              avgStepsPerHour = totalSteps / 24)
+
+
+
+# Select columns
+dayTypeSummary2 <- dayTypeSummary2[, c(1,4)]
+
+head(dayTypeSummary2, 6)
+```
+
+
+```{r, echo = TRUE}
+# Join with original data frame
+df3 <- left_join(df, dayTypeSummary2, by = "dayOfWeek")
+
+head(df3, 6)
+```
+
+
+If the steps field is blank, replace with the average steps for that particular day  
+```{r, echo = TRUE}
+df3$steps <- ifelse(is.na(df3$steps), df3$avgStepsPer5minInterval, df3$steps)
+
+head(df3, 6)
+```
+
+
+Split into two data frames for plotting
+```{r}
+df3weekdays <- df3 %>% filter(dayType == "weekday")
+df3weekends <- df3 %>% filter(dayType == "weekend")
+```
+
+
+
+2. Make a panel plot containing a time series plot (i.e., type = "l") of the 5-minute interval (x-axis) and the
+    average number of steps taken, averaged across all weekday days or weekend days (y-axis).  See the README file 
+    in the Github repo to see an example of what this plot should look like using simulated data.  
+    
+```{r, echo = TRUE}
+# Set the plotting parameters for 2 rows and 1 column
+par(mfrow = c(2,1))
+
+# Plot for weekdays
+plot(df3weekdays$newDate, df3weekdays$steps,
+     type = "l",
+     col = "red",
+     lwd = 2,
+     main = "Average Weekday Steps per 5-Minute Interval:  Oct '12 - Dec '12",
+     xlab ="Date",
+     ylab = "Avg Steps per 5 Minute Interval",
+     ylim = c(0,850))
+
+# Plot for weekends
+plot(df3weekends$newDate, df3weekends$steps,
+     type = "l",
+     col = "blue",
+     lwd = 2,
+     main = "Average Weekend Steps per 5-Minute Interval:  Oct '12 - Dec '12",
+     xlab ="Date",
+     ylab = "Avg Steps per 5 Minute Interval",
+     ylim = c(0,850))
+```
+
+**This completes my first real markdown document.**
+
+*May you be happy.  May you be free from suffering.*
+
