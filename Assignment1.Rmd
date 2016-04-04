@@ -1,5 +1,5 @@
 
-```{r, setoptions, echo = TRUE, results = "asis"}
+```{r, setoptions, echo = TRUE, results = "asis", eval = TRUE}
 ```
 
 
