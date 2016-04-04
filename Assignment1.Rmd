@@ -20,7 +20,7 @@ library(knitr)
 ```
 
 
-```{r}
+```{r, echo = TRUE}
 # Read in data 
 df <- read.csv("activity.csv",
                na.strings = c("NA",""), 
@@ -40,7 +40,7 @@ df$interval <- as.numeric(df$interval)
 ```
 
 # Create a new unique date field
-```{r}
+```{r, echo = TRUE}
 # Add leading zeros to the interval field
 df$newInterval <- sprintf("%04d", df$interval)
 
@@ -55,7 +55,7 @@ head(df, 6)
 ```
 
 
-```{r}
+```{r, echo = TRUE}
 # Add a field for day of Week
 df$dayOfWeek <- weekdays(df$date)
 
@@ -71,7 +71,7 @@ head(df,6)
 
 
 # Summarise overall
-```{r}
+```{r, echo = TRUE}
 pacesSummary <- df %>% 
     summarise(stepsTaken = sum(steps, na.rm = TRUE), # Total number of steps taken
               days = n_distinct(date), # Total number of days
@@ -89,7 +89,7 @@ head(pacesSummary)
 
 
 # Group by date and then summarise for each day
-```{r}
+```{r, echo = TRUE}
 dailyPaces <- df %>% 
     group_by(date) %>% 
     summarise(dailyEntries = n(),
@@ -141,7 +141,7 @@ colnames(stepsEachDay) <- "Steps"
 ```
 
 #     2. Make a histogram of the total number of steps taken each day
-```{r}
+```{r, echo = TRUE}
 ggplot(stepsEachDay, aes(Steps)) +
     geom_histogram(bins = 20, color = "green4", fill = "green") +
     annotate(geom = "text", label = "Mean Steps per Day: ", x = 16500, y = 9, fontface = "italic") +
@@ -156,14 +156,14 @@ ggplot(stepsEachDay, aes(Steps)) +
 
 #####################   WHAT IS THE AVERAGE DAILY ACTIVITY PATTERN?   ##################### 
 
-```{r}
+```{r, echo = TRUE}
 # Select only necessary columns for joining
 daily1 <- dailyPaces[, c(1,7)] # The Date field and the Avg Steps per 5-minute interval field
 
 head(daily1, 6)
 ```
 
-```{r}
+```{r, echo = TRUE}
 # Add a column to the original data frame that includes the average steps for that day
 df1 <- left_join(df, daily1, by = "date") 
 
@@ -174,7 +174,7 @@ head(df1, 6)
 #     1. Make a times series plot (i.e., type = "l") of the 5-minute interval (x-axis) and 
 #        the average number of steps taken, averaged across all days (y-axis)
 
-```{r}
+```{r, echo = TRUE}
 par(mfrow = c(1,1))
 plot(df1$newDate, df1$avgStepsPer5minInterval,
      type = "l",
@@ -187,7 +187,7 @@ plot(df1$newDate, df1$avgStepsPer5minInterval,
 
 
 #     2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
-```{r}
+```{r, echo = TRUE}
 busiestFiveMins <- df %>% 
     group_by(hoursMinutes) %>% 
     summarise(stepsTaken = sum(steps, na.rm = TRUE)) %>% 
@@ -219,7 +219,7 @@ avgStepsPer5mins
 
 
 #    3. Create a new dataset that is equal to the original dataset but with the missing data filled in.
-```{r}
+```{r, echo = TRUE}
 newDataset <- df 
 
 head(newDataset, 6)
@@ -227,7 +227,7 @@ head(newDataset, 6)
 
 
 # Fill in missing values with the overall average steps per 5-minute interval
-```{r}
+```{r, echo = TRUE}
 newDataset$steps[is.na(newDataset$steps)] <- avgStepsPer5mins
 
 head(newDataset, 6)
@@ -240,7 +240,7 @@ head(newDataset, 6)
 #    What is the impact of imputing missing data on the estimates of the total daily number of steps?
 
 # Summarise overall again
-```{r}
+```{r, echo = TRUE}
 pacesSummary1 <- newDataset %>% 
     summarise(stepsTaken = sum(steps, na.rm = TRUE), # Total number of steps taken
               days = n_distinct(date), # Total number of days
@@ -258,7 +258,7 @@ head(pacesSummary1, 6)
 
 
 # Group by date to summarise for each day
-```{r}
+```{r, echo = TRUE}
 dailyPaces1 <- newDataset %>% 
     group_by(date) %>% 
     summarise(dailyEntries = n(),
@@ -319,7 +319,7 @@ colnames(stepsEachDay2) <- "Steps"
 #     2. Make a histogram of the total number of steps taken each day and Calculate and report the MEAN and MEDIAN  
 #        total number of steps taken per day.  
 
-```{r}
+```{r, echo = TRUE}
 ggplot(stepsEachDay2, aes(Steps)) +
     geom_histogram(bins = 20, color = "blue", fill = "dodgerblue") +
     annotate(geom = "text", label = "Mean Steps per Day: ", x = 16500, y = 9, fontface = "italic") +
@@ -336,7 +336,7 @@ ggplot(stepsEachDay2, aes(Steps)) +
 #     1. Create a nuew factor variable in the dataset with two levels - "weekday" and "weekend" - 
 #           indicating whether a given date is a weekday or weekend day.
 
-```{r}
+```{r, echo = TRUE}
 # Create a weekdays vector and a weekends vector
 weekdays <- c("Monday","Tuesday","Wednesday","Thursday","Friday")
 
@@ -349,7 +349,7 @@ df$dayType <- factor(df$dayType, levels = c("weekday","weekend"))
 head(df, 6)
 ```
 
-```{r}
+```{r, echo = TRUE}
 # Group by Day Type and Day of week and summarise to find mean for each 
 dayTypeSummary2 <- df %>% 
     group_by(dayOfWeek) %>% 
@@ -368,7 +368,7 @@ head(dayTypeSummary2, 6)
 
 
 # Join with original data frame
-```{r}
+```{r, echo = TRUE}
 df3 <- left_join(df, dayTypeSummary2, by = "dayOfWeek")
 
 head(df3, 6)
@@ -376,7 +376,7 @@ head(df3, 6)
 
 
 # If the steps field is blank, replace with the average steps for that particular day
-```{r}
+```{r, echo = TRUE}
 df3$steps <- ifelse(is.na(df3$steps), df3$avgStepsPer5minInterval, df3$steps)
 
 head(df3, 6)
@@ -394,7 +394,7 @@ df3weekends <- df3 %>% filter(dayType == "weekend")
 #     2. Make a panel plot containing a time series plot (i.e., type = "l") of the 5-minute interval (x-axis) and the
 #        average number of steps taken, averaged across all weekday days or weekend days (y-axis).  See the README file 
 #        in the Github repo to see an example of what this plot should look like using simulated data.
-```{r}
+```{r, echo = TRUE}
 # Set the plotting parameters for 2 rows and 1 column
 par(mfrow = c(2,1))
 
